@@ -11,6 +11,7 @@ var width: gtk.gint = 360;
 var height: gtk.gint = 180;
 var ok_label: [:0]const u8 = "Yes";
 var cancel_label: [:0]const u8 = "No";
+var timeout: ?gtk.guint = null;
 
 var text: [:0]const u8 = "";
 var text_changed = false;
@@ -60,6 +61,7 @@ const help_general =
     \\  --title=TITLE                     Set the dialog title
     \\  --width=WIDTH                     Set the window width
     \\  --height=HEIGHT                   Set the window height
+    \\  --timeout=TIMEOUT                 Set dialog timeout in seconds
     \\  --ok-label=TEXT                   Set the label of the OK button
     \\  --cancel-label=TEXT               Set the label of the Cancel button
 ;
@@ -82,6 +84,13 @@ pub fn cancel_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
     //gtk.g_print("You clicked Cancel\n");
     return_code = 1;
     gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
+}
+
+pub fn timer_callback(data: gtk.gpointer) callconv(.C) gtk.gboolean {
+    _ = data;
+    return_code = 5;
+    gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
+    return gtk.G_SOURCE_REMOVE;
 }
 
 /// Center the given window on the screen
@@ -174,6 +183,15 @@ fn parseOptions() void {
         } else if (std.mem.eql(u8, "--text", option)) {
             text = argument;
             text_changed = true;
+        } else if (std.mem.eql(u8, "--timeout", option)) {
+            const timeout_ = std.fmt.parseInt(gtk.guint, argument_no_null, 0) catch {
+                continue;
+            };
+
+            // Time must be between 1 second and one hour
+            if (timeout_ > 0 and timeout_ < 3600) {
+                timeout = timeout_ * 1000; // the timeout is specified in ms
+            }
         }
     }
 }
@@ -203,6 +221,11 @@ pub fn main() !u8 {
             return 255;
         },
     }
+
+    if (timeout) |tout| {
+        _ = gtk.g_timeout_add(tout, timer_callback, null);
+    }
+
     const status: i32 = gtk.g_application_run(@as(*gtk.GApplication, @ptrCast(application)), 0, null);
     _ = status;
 
