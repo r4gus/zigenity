@@ -113,7 +113,7 @@ fn centerWindow(window: *gtk.GtkWidget) void {
     gtk.gtk_window_move(@as(*gtk.GtkWindow, @ptrCast(window)), x, y);
 }
 
-fn question(app: *gtk.GtkApplication, _: gtk.gpointer) void {
+fn activate(app: *gtk.GtkApplication, _: gtk.gpointer) void {
     const window_widget: *gtk.GtkWidget = gtk.gtk_application_window_new(app);
     const window = @as(*gtk.GtkWindow, @ptrCast(window_widget));
     gtk.gtk_window_set_title(window, title);
@@ -129,8 +129,18 @@ fn question(app: *gtk.GtkApplication, _: gtk.gpointer) void {
         }
     }
 
+    switch (typ) {
+        .Question => questionDialog(window_widget),
+        else => unreachable,
+    }
+
+    centerWindow(window_widget);
+    gtk.gtk_widget_show_all(window_widget);
+}
+
+fn questionDialog(window_widget: *gtk.GtkWidget) void {
     const vbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_VERTICAL, 5);
-    gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window)), vbox);
+    gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window_widget)), vbox);
 
     const label = gtk.gtk_label_new(text);
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), label, 1, 1, 0);
@@ -145,9 +155,6 @@ fn question(app: *gtk.GtkApplication, _: gtk.gpointer) void {
     const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
     _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), null);
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
-
-    centerWindow(window_widget);
-    gtk.gtk_widget_show_all(window_widget);
 }
 
 /// Parse option. Errors are silently discarded.
@@ -216,7 +223,6 @@ pub fn main() !u8 {
     defer gtk.g_object_unref(application);
 
     switch (typ) {
-        .Question => _ = gtk.g_signal_connect_(application, "activate", @as(gtk.GCallback, @ptrCast(&question)), null),
         .Help => {
             try std.io.getStdOut().writeAll(help_text);
             return 0;
@@ -229,10 +235,11 @@ pub fn main() !u8 {
             try std.io.getStdOut().writeAll(help_question);
             return 0;
         },
-        else => {
+        .None => {
             try std.io.getStdErr().writeAll("You must specify a dialog type. See 'zigenity --help' for details\n");
             return 255;
         },
+        else => _ = gtk.g_signal_connect_(application, "activate", @as(gtk.GCallback, @ptrCast(&activate)), null),
     }
 
     if (timeout) |tout| {
