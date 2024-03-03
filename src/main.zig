@@ -2,9 +2,9 @@ const std = @import("std");
 const gtk = @import("gtk.zig");
 
 var application: *gtk.GtkApplication = undefined;
-
 var return_code: u8 = 0;
 var typ: DialogType = .None;
+
 var title: [:0]const u8 = "Title";
 var title_changed = false;
 var width: gtk.gint = 360;
@@ -12,10 +12,14 @@ var height: gtk.gint = 180;
 var ok_label: [:0]const u8 = "Yes";
 var cancel_label: [:0]const u8 = "No";
 
+var text: [:0]const u8 = "";
+var text_changed = false;
+
 const DialogType = enum {
     Question,
     Help,
     HelpGeneral,
+    HelpQuestion,
     None,
 
     pub fn fromString(s: []const u8) DialogType {
@@ -23,8 +27,11 @@ const DialogType = enum {
             return .Help;
         } else if (std.mem.eql(u8, "--help-general", s)) {
             return .HelpGeneral;
+        } else if (std.mem.eql(u8, "--help-question", s)) {
+            return .HelpQuestion;
         } else if (std.mem.eql(u8, "--question", s)) {
             if (!title_changed) title = "Question";
+            if (!text_changed) text = "Are you sure you want to proceed?";
             return .Question;
         } else {
             return .None;
@@ -39,6 +46,7 @@ const help_text =
     \\Help Options:
     \\  -h, --help                        Show help options
     \\  --help-general                    Show general options
+    \\  --help-question                   Show question options
     \\
     \\Application Options:
     \\  --question                        Display a question dialog
@@ -54,6 +62,15 @@ const help_general =
     \\  --height=HEIGHT                   Set the window height
     \\  --ok-label=TEXT                   Set the label of the OK button
     \\  --cancel-label=TEXT               Set the label of the Cancel button
+;
+
+const help_question =
+    \\Usage:
+    \\  zigenity [OPTION...]
+    \\
+    \\Question options:
+    \\  --question                        Display a question dialog
+    \\  --text=TEXT                       Set the dialog text
 ;
 
 pub fn ok_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
@@ -95,7 +112,7 @@ fn question(app: *gtk.GtkApplication, _: gtk.gpointer) void {
     const vbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_VERTICAL, 5);
     gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window)), vbox);
 
-    const label = gtk.gtk_label_new("Are you sure you want to proceed?");
+    const label = gtk.gtk_label_new(text);
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), label, 1, 1, 0);
 
     const hbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_HORIZONTAL, 5);
@@ -141,6 +158,7 @@ fn parseOptions() void {
 
         if (std.mem.eql(u8, "--title", option)) {
             title = argument;
+            title_changed = true;
         } else if (std.mem.eql(u8, "--width", option)) {
             width = std.fmt.parseInt(gtk.gint, argument_no_null, 0) catch {
                 continue;
@@ -153,6 +171,9 @@ fn parseOptions() void {
             ok_label = argument;
         } else if (std.mem.eql(u8, "--cancel-label", option)) {
             cancel_label = argument;
+        } else if (std.mem.eql(u8, "--text", option)) {
+            text = argument;
+            text_changed = true;
         }
     }
 }
@@ -171,6 +192,10 @@ pub fn main() !u8 {
         },
         .HelpGeneral => {
             try std.io.getStdOut().writeAll(help_general);
+            return 0;
+        },
+        .HelpQuestion => {
+            try std.io.getStdOut().writeAll(help_question);
             return 0;
         },
         else => {
