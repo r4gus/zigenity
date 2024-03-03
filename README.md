@@ -1,6 +1,8 @@
 # zigenity
 
-Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglang.org/).
+Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglang.org/) and only for Linux.
+
+![Question Dialog](static/example01.png)
 
 ## Dialog Types
 
@@ -27,6 +29,15 @@ Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglan
 * `gtk+-3.0`
 
 ## Getting started
+
+To build this application you need [Zig 0.11.0](https://ziglang.org/download/).
+After installing Zig run the following commands to build the application:
+
+```
+git clone https://github.com/r4gus/zigenity.git
+cd zigenity
+zig build -Doptimize=ReleaseSmall
+```
 
 Run `zigenity --help` for a list of options.
 
