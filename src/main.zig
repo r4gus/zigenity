@@ -1,13 +1,16 @@
 const std = @import("std");
 const gtk = @import("gtk.zig");
 
+var application: *gtk.GtkApplication = undefined;
+
+var return_code: u8 = 0;
 var typ: DialogType = .None;
 var title: [:0]const u8 = "Title";
 var title_changed = false;
 var width: gtk.gint = 360;
 var height: gtk.gint = 180;
-var ok_label: [:0]const u8 = "Ok";
-var cancel_label: [:0]const u8 = "Cancel";
+var ok_label: [:0]const u8 = "Yes";
+var cancel_label: [:0]const u8 = "No";
 
 const DialogType = enum {
     Question,
@@ -54,11 +57,14 @@ const help_general =
 ;
 
 pub fn ok_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
-    gtk.g_print("You clicked Ok\n");
+    //gtk.g_print("You clicked Ok\n");
+    gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
 }
 
 pub fn cancel_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
-    gtk.g_print("You clicked Cancel\n");
+    //gtk.g_print("You clicked Cancel\n");
+    return_code = 1;
+    gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
 }
 
 /// Center the given window on the screen
@@ -154,11 +160,11 @@ fn parseOptions() void {
 pub fn main() !u8 {
     parseOptions();
 
-    var app = gtk.gtk_application_new("de.sugaryourcoffee.zigenity", gtk.G_APPLICATION_FLAGS_NONE);
-    defer gtk.g_object_unref(app);
+    application = gtk.gtk_application_new("de.sugaryourcoffee.zigenity", gtk.G_APPLICATION_FLAGS_NONE);
+    defer gtk.g_object_unref(application);
 
     switch (typ) {
-        .Question => _ = gtk.g_signal_connect_(app, "activate", @as(gtk.GCallback, @ptrCast(&question)), null),
+        .Question => _ = gtk.g_signal_connect_(application, "activate", @as(gtk.GCallback, @ptrCast(&question)), null),
         .Help => {
             try std.io.getStdOut().writeAll(help_text);
             return 0;
@@ -172,9 +178,10 @@ pub fn main() !u8 {
             return 255;
         },
     }
-    const status: i32 = gtk.g_application_run(@as(*gtk.GApplication, @ptrCast(app)), 0, null);
+    const status: i32 = gtk.g_application_run(@as(*gtk.GApplication, @ptrCast(application)), 0, null);
+    _ = status;
 
-    return @as(u8, @intCast(status));
+    return return_code;
 }
 
 pub fn strlen(s: [*c]const u8) usize {
