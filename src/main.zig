@@ -12,6 +12,7 @@ var height: gtk.gint = 180;
 var ok_label: [:0]const u8 = "Yes";
 var cancel_label: [:0]const u8 = "No";
 var timeout: ?gtk.guint = null;
+var window_icon: ?[:0]const u8 = null;
 
 var text: [:0]const u8 = "";
 var text_changed = false;
@@ -59,6 +60,7 @@ const help_general =
     \\
     \\General options:
     \\  --title=TITLE                     Set the dialog title
+    \\  --window-icon=ICONPATH            Set the window icon
     \\  --width=WIDTH                     Set the window width
     \\  --height=HEIGHT                   Set the window height
     \\  --timeout=TIMEOUT                 Set dialog timeout in seconds
@@ -118,6 +120,15 @@ fn question(app: *gtk.GtkApplication, _: gtk.gpointer) void {
     gtk.gtk_window_set_default_size(window, width, height);
     gtk.gtk_container_set_border_width(@as(*gtk.GtkContainer, @ptrCast(window_widget)), 10);
 
+    if (window_icon) |icon_path| {
+        var err: [*c]gtk.GError = 0;
+        const icon = gtk.gdk_pixbuf_new_from_file(icon_path, &err);
+
+        if (err == 0) {
+            gtk.gtk_window_set_icon(window, icon);
+        }
+    }
+
     const vbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_VERTICAL, 5);
     gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window)), vbox);
 
@@ -168,6 +179,8 @@ fn parseOptions() void {
         if (std.mem.eql(u8, "--title", option)) {
             title = argument;
             title_changed = true;
+        } else if (std.mem.eql(u8, "--window-icon", option)) {
+            window_icon = argument;
         } else if (std.mem.eql(u8, "--width", option)) {
             width = std.fmt.parseInt(gtk.gint, argument_no_null, 0) catch {
                 continue;
