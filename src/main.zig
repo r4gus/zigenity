@@ -19,9 +19,11 @@ var text_changed = false;
 
 const DialogType = enum {
     Question,
+    Password,
     Help,
     HelpGeneral,
     HelpQuestion,
+    HelpPassword,
     None,
 
     pub fn fromString(s: []const u8) DialogType {
@@ -31,10 +33,16 @@ const DialogType = enum {
             return .HelpGeneral;
         } else if (std.mem.eql(u8, "--help-question", s)) {
             return .HelpQuestion;
+        } else if (std.mem.eql(u8, "--help-password", s)) {
+            return .HelpPassword;
         } else if (std.mem.eql(u8, "--question", s)) {
             if (!title_changed) title = "Question";
             if (!text_changed) text = "Are you sure you want to proceed?";
             return .Question;
+        } else if (std.mem.eql(u8, "--password", s)) {
+            if (!title_changed) title = "Password";
+            if (!text_changed) text = "Type your password";
+            return .Password;
         } else {
             return .None;
         }
@@ -52,6 +60,7 @@ const help_text =
     \\
     \\Application Options:
     \\  --question                        Display a question dialog
+    \\  --password                        Display a password dialog
 ;
 
 const help_general =
@@ -77,8 +86,24 @@ const help_question =
     \\  --text=TEXT                       Set the dialog text
 ;
 
-pub fn ok_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
-    //gtk.g_print("You clicked Ok\n");
+const help_password =
+    \\Usage:
+    \\  zigenity [OPTION...]
+    \\
+    \\Password options:
+    \\  --password                        Display a password dialog
+    \\  --text=TEXT                       Set the dialog text
+;
+
+pub fn ok_callback(_: *gtk.GtkWidget, data: gtk.gpointer) void {
+    if (typ == .Password) {
+        const entry = @as(*gtk.GtkEntry, @ptrCast(@alignCast(data.?)));
+        const password = gtk.gtk_entry_get_text(entry);
+        std.io.getStdOut().writer().print("{s}\n", .{password[0..strlen(password)]}) catch {
+            return_code = 254; // TODO: what would indicate such a failure?
+        };
+    }
+
     gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
 }
 
@@ -131,6 +156,7 @@ fn activate(app: *gtk.GtkApplication, _: gtk.gpointer) void {
 
     switch (typ) {
         .Question => questionDialog(window_widget),
+        .Password => passwordDialog(window_widget),
         else => unreachable,
     }
 
@@ -154,6 +180,31 @@ fn questionDialog(window_widget: *gtk.GtkWidget) void {
 
     const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
     _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), null);
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
+}
+
+fn passwordDialog(window_widget: *gtk.GtkWidget) void {
+    const vbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_VERTICAL, 5);
+    gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window_widget)), vbox);
+
+    const label = gtk.gtk_label_new(text);
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), label, 1, 1, 0);
+
+    const entry = gtk.gtk_entry_new();
+    gtk.gtk_entry_set_visibility(@as(*gtk.GtkEntry, @ptrCast(entry)), 0);
+    gtk.gtk_entry_set_invisible_char(@as(*gtk.GtkEntry, @ptrCast(entry)), '*');
+    gtk.gtk_entry_set_placeholder_text(@as(*gtk.GtkEntry, @ptrCast(entry)), "Enter password");
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), entry, 0, 0, 0);
+
+    const hbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk.gtk_box_pack_end(@as(*gtk.GtkBox, @ptrCast(vbox)), hbox, 0, 0, 0);
+
+    const cancel_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(cancel_label);
+    _ = gtk.g_signal_connect_(cancel_button, "clicked", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), cancel_button, 1, 1, 0);
+
+    const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
+    _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), entry);
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
 }
 
@@ -233,6 +284,10 @@ pub fn main() !u8 {
         },
         .HelpQuestion => {
             try std.io.getStdOut().writeAll(help_question);
+            return 0;
+        },
+        .HelpPassword => {
+            try std.io.getStdOut().writeAll(help_password);
             return 0;
         },
         .None => {
