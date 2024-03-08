@@ -13,6 +13,7 @@ var ok_label: [:0]const u8 = "Yes";
 var cancel_label: [:0]const u8 = "No";
 var timeout: ?gtk.guint = null;
 var window_icon: ?[:0]const u8 = null;
+var base_icon: ?[:0]const u8 = null;
 
 var text: [:0]const u8 = "";
 var text_changed = false;
@@ -84,6 +85,7 @@ const help_question =
     \\Question options:
     \\  --question                        Display a question dialog
     \\  --text=TEXT                       Set the dialog text
+    \\  --icon=ICONPATH                   Set the icon
 ;
 
 const help_password =
@@ -168,8 +170,21 @@ fn questionDialog(window_widget: *gtk.GtkWidget) void {
     const vbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_VERTICAL, 5);
     gtk.gtk_container_add(@as(*gtk.GtkContainer, @ptrCast(window_widget)), vbox);
 
+    const tbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), tbox, 1, 1, 0);
+
+    if (base_icon) |icon_path| {
+        var err: [*c]gtk.GError = 0;
+        const icon = gtk.gdk_pixbuf_new_from_file_at_scale(icon_path, 64, 64, 1, &err);
+
+        if (err == 0) {
+            const image = gtk.gtk_image_new_from_pixbuf(icon);
+            gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(tbox)), image, 1, 1, 0);
+        }
+    }
+
     const label = gtk.gtk_label_new(text);
-    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(vbox)), label, 1, 1, 0);
+    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(tbox)), label, 1, 1, 0);
 
     const hbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_HORIZONTAL, 5);
     gtk.gtk_box_pack_end(@as(*gtk.GtkBox, @ptrCast(vbox)), hbox, 0, 0, 0);
@@ -263,6 +278,8 @@ fn parseOptions() void {
             if (timeout_ > 0 and timeout_ < 3600) {
                 timeout = timeout_ * 1000; // the timeout is specified in ms
             }
+        } else if (std.mem.eql(u8, "--icon", option)) {
+            base_icon = argument;
         }
     }
 }
