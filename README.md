@@ -12,7 +12,7 @@ Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglan
 | entry | |
 | error | |
 | info | |
-| file-selection | |
+| file-selection | ✅ |
 | list | |
 | notification | |
 | progress | |
@@ -21,7 +21,7 @@ Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglan
 | scale | |
 | text-info | |
 | color-selection | |
-| password |✅|
+| password | ✅ |
 | forms | |
 
 ## Dependency
