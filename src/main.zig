@@ -148,6 +148,20 @@ pub fn file_callback(chooser: *gtk.GtkFileChooser, _: gtk.gpointer) void {
     gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
 }
 
+pub fn file_button_callback(dialog: *gtk.GtkDialog, response_id: gtk.gint, _: gtk.gpointer) void {
+    if (response_id == gtk.GTK_RESPONSE_ACCEPT) {
+        const chooser = @as(*gtk.GtkFileChooser, @ptrCast(dialog));
+        const fname = gtk.gtk_file_chooser_get_filename(chooser);
+        std.io.getStdOut().writer().print("{s}\n", .{fname[0..strlen(fname)]}) catch {
+            return_code = 254; // TODO: what would indicate such a failure?
+        };
+    } else { // Cancel
+        return_code = 1;
+    }
+
+    gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
+}
+
 /// Center the given window on the screen
 fn centerWindow(window: *gtk.GtkWidget) void {
     var screen_rect: gtk.GdkRectangle = undefined;
@@ -270,7 +284,7 @@ fn fileDialog(window_widget: *gtk.GtkWidget) *gtk.GtkWidget {
     );
 
     _ = gtk.g_signal_connect_(file_chooser, "file-activated", @as(gtk.GCallback, @ptrCast(&file_callback)), null);
-    _ = gtk.g_signal_connect_(file_chooser, "response", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
+    _ = gtk.g_signal_connect_(file_chooser, "response", @as(gtk.GCallback, @ptrCast(&file_button_callback)), null);
 
     return file_chooser;
 }
