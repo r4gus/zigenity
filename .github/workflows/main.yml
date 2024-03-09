@@ -27,10 +27,14 @@ jobs:
       - run: |
           sudo apt install libgtk-3-0 libgtk-3-dev
           zig build -Doptimize=ReleaseSmall
+          tar -czf zigenity.tgz zig-out/bin/zigenity
       - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ env.Version }}"
-          generate_release_notes: true
-          files: |
-            zig-out/bin/zigenity
+        run: hub release create ${{ env.Version }} -m "Automatic release ${{ env.Version }} $(date +'%Y.%m.%d_%H-%M')" -a zigenity.tgz
+        #uses: softprops/action-gh-release@v2
+        #env:
+        #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        #with:
+        #  tag_name: ${{ env.Version }}
+        #  generate_release_notes: true
+        #  files: |
+        #    zig-out/bin/zigenity
