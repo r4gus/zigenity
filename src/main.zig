@@ -18,13 +18,17 @@ var base_icon: ?[:0]const u8 = null;
 var text: [:0]const u8 = "";
 var text_changed = false;
 
+var directory_only: bool = false;
+
 const DialogType = enum {
     Question,
     Password,
+    FileSelection,
     Help,
     HelpGeneral,
     HelpQuestion,
     HelpPassword,
+    HelpFileSelection,
     None,
 
     pub fn fromString(s: []const u8) DialogType {
@@ -36,6 +40,8 @@ const DialogType = enum {
             return .HelpQuestion;
         } else if (std.mem.eql(u8, "--help-password", s)) {
             return .HelpPassword;
+        } else if (std.mem.eql(u8, "--help-file-selection", s)) {
+            return .HelpFileSelection;
         } else if (std.mem.eql(u8, "--question", s)) {
             if (!title_changed) title = "Question";
             if (!text_changed) text = "Are you sure you want to proceed?";
@@ -44,6 +50,8 @@ const DialogType = enum {
             if (!title_changed) title = "Password";
             if (!text_changed) text = "Type your password";
             return .Password;
+        } else if (std.mem.eql(u8, "--file-selection", s)) {
+            return .FileSelection;
         } else {
             return .None;
         }
@@ -97,6 +105,15 @@ const help_password =
     \\  --text=TEXT                       Set the dialog text
 ;
 
+const help_file_selection =
+    \\Usage:
+    \\  zigenity [OPTION...]
+    \\
+    \\File Selection options:
+    \\  --file-selection                  Display file selection dialog
+    \\  --directory                       Activate directory-only selection
+;
+
 pub fn ok_callback(_: *gtk.GtkWidget, data: gtk.gpointer) void {
     if (typ == .Password) {
         const entry = @as(*gtk.GtkEntry, @ptrCast(@alignCast(data.?)));
@@ -122,6 +139,15 @@ pub fn timer_callback(data: gtk.gpointer) callconv(.C) gtk.gboolean {
     return gtk.G_SOURCE_REMOVE;
 }
 
+pub fn file_callback(chooser: *gtk.GtkFileChooser, _: gtk.gpointer) void {
+    const fname = gtk.gtk_file_chooser_get_filename(chooser);
+    std.io.getStdOut().writer().print("{s}\n", .{fname[0..strlen(fname)]}) catch {
+        return_code = 254; // TODO: what would indicate such a failure?
+    };
+
+    gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
+}
+
 /// Center the given window on the screen
 fn centerWindow(window: *gtk.GtkWidget) void {
     var screen_rect: gtk.GdkRectangle = undefined;
@@ -141,7 +167,7 @@ fn centerWindow(window: *gtk.GtkWidget) void {
 }
 
 fn activate(app: *gtk.GtkApplication, _: gtk.gpointer) void {
-    const window_widget: *gtk.GtkWidget = gtk.gtk_application_window_new(app);
+    var window_widget: *gtk.GtkWidget = gtk.gtk_application_window_new(app);
     const window = @as(*gtk.GtkWindow, @ptrCast(window_widget));
     gtk.gtk_window_set_title(window, title);
     gtk.gtk_window_set_default_size(window, width, height);
@@ -156,13 +182,15 @@ fn activate(app: *gtk.GtkApplication, _: gtk.gpointer) void {
         }
     }
 
+    centerWindow(window_widget);
+
     switch (typ) {
         .Question => questionDialog(window_widget),
         .Password => passwordDialog(window_widget),
+        .FileSelection => window_widget = fileDialog(window_widget),
         else => unreachable,
     }
 
-    centerWindow(window_widget);
     gtk.gtk_widget_show_all(window_widget);
 }
 
@@ -223,6 +251,30 @@ fn passwordDialog(window_widget: *gtk.GtkWidget) void {
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
 }
 
+fn fileDialog(window_widget: *gtk.GtkWidget) *gtk.GtkWidget {
+    const action: c_uint = if (directory_only) blk: {
+        break :blk gtk.GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER;
+    } else blk: {
+        break :blk gtk.GTK_FILE_CHOOSER_ACTION_OPEN;
+    };
+
+    const file_chooser = gtk.gtk_file_chooser_dialog_new(
+        "Open File",
+        @as(*gtk.GtkWindow, @ptrCast(window_widget)),
+        action,
+        "Cancel",
+        gtk.GTK_RESPONSE_CANCEL,
+        "Open",
+        gtk.GTK_RESPONSE_ACCEPT,
+        @as(usize, @intCast(0)),
+    );
+
+    _ = gtk.g_signal_connect_(file_chooser, "file-activated", @as(gtk.GCallback, @ptrCast(&file_callback)), null);
+    _ = gtk.g_signal_connect_(file_chooser, "response", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
+
+    return file_chooser;
+}
+
 /// Parse option. Errors are silently discarded.
 fn parseOptions() void {
     for (std.os.argv[1..]) |arg| {
@@ -280,6 +332,8 @@ fn parseOptions() void {
             }
         } else if (std.mem.eql(u8, "--icon", option)) {
             base_icon = argument;
+        } else if (std.mem.eql(u8, "--directory", option)) {
+            directory_only = true;
         }
     }
 }
@@ -305,6 +359,10 @@ pub fn main() !u8 {
         },
         .HelpPassword => {
             try std.io.getStdOut().writeAll(help_password);
+            return 0;
+        },
+        .HelpFileSelection => {
+            try std.io.getStdOut().writeAll(help_file_selection);
             return 0;
         },
         .None => {
