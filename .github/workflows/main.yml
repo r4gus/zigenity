@@ -24,12 +24,13 @@ jobs:
       - run: |
           export VERSION="$(cat build.zig.zon | grep -o -E '\b[0-9]+\.[0-9]+\.[0-9]+\b')"
           sudo apt install libgtk-3-0 libgtk-3-dev
+          mkdir exe
           zig build -Doptimize=ReleaseSmall
-          cp zig-out/bin/zigenity "zigenity-${VERSION}-x86_64"
+          cp zig-out/bin/zigenity exe/zigenity-${VERSION}-x86_64
       - name: Release
         run: |
           export VERSION="$(cat build.zig.zon | grep -o -E '\b[0-9]+\.[0-9]+\.[0-9]+\b')"
-          gh release create $VERSION --latest -F "changelog/${VERSION}.md" ./zig-out/bin/*
+          gh release create $VERSION --latest -F "changelog/${VERSION}.md" ./exe/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         #uses: softprops/action-gh-release@v2
