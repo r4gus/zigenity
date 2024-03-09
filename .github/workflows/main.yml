@@ -27,8 +27,9 @@ jobs:
       - run: |
           sudo apt install libgtk-3-0 libgtk-3-dev
           zig build -Doptimize=ReleaseSmall
+          echo "${{ env.Version }}"
       - name: Release
-        run: gh release create ${{ env.Version }} --latest -F changelog.md ./zig-out/bin/*
+        run: gh release create 0.1.1 --latest -F changelog.md ./zig-out/bin/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         #uses: softprops/action-gh-release@v2
