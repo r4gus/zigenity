@@ -296,8 +296,14 @@ fn parseOptions() void {
         // Here we make sure the 'argument' is the second half of 'arg' because
         // this implies that it is null-terminated, i.e., we can safely cast
         // argument from a '[]const u8' to a '[:0]const u8'.
-        if (option_ == null or argument_ == null or please_dont != null) continue;
+        if (option_ == null) continue;
         const option = option_.?;
+
+        if (std.mem.eql(u8, "--directory", option)) {
+            directory_only = true;
+        }
+
+        if (argument_ == null or please_dont != null) continue;
         const argument: [:0]const u8 = @ptrCast(argument_.?);
         const argument_no_null = argument[0 .. argument.len - 1];
 
@@ -332,8 +338,6 @@ fn parseOptions() void {
             }
         } else if (std.mem.eql(u8, "--icon", option)) {
             base_icon = argument;
-        } else if (std.mem.eql(u8, "--directory", option)) {
-            directory_only = true;
         }
     }
 }
