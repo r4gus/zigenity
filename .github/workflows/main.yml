@@ -27,10 +27,20 @@ jobs:
           mkdir exe
           zig build -Doptimize=ReleaseSmall
           cp zig-out/bin/zigenity exe/zigenity-${VERSION}-x86_64
+      - name: Debian Package
+        run: |
+          sudo apt install dpkg debhelper fakeroot
+          export VERSION="$(cat build.zig.zon | grep -o -E '\b[0-9]+\.[0-9]+\.[0-9]+\b')"
+          mkdir -p debian/zigenity
+          cp -r packages/DEBIAN debian/zigenity/
+          sed -i "s/VERSION/${VERSION}/g" debian/zigenity/DEBIAN/control
+          mkdir -p debian/zigenity/usr/bin
+          cp zig-out/bin/zigenity debian/zigenity/usr/bin
+          dpkg-deb --build debian/zigenity/
       - name: Release
         run: |
           export VERSION="$(cat build.zig.zon | grep -o -E '\b[0-9]+\.[0-9]+\.[0-9]+\b')"
-          gh release create $VERSION --latest -F "changelog/${VERSION}.md" ./exe/*
+          gh release create $VERSION --latest -F "changelog/${VERSION}.md" ./exe/* debian/zigenity.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         #uses: softprops/action-gh-release@v2

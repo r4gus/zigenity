@@ -1,0 +1,6 @@
+Package: zigenity
+Version: VERSION
+Architecture: amd64
+Maintainer: David P. Sugar <david@thesugar.de>
+Description: zigenity is a program, inspired by zenity and implemented in Zig, that allows the creation of dialog boxes from the command line.
+Depends: gtk3 (>= 3.0)
