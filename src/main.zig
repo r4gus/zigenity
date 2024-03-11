@@ -10,7 +10,9 @@ var title_changed = false;
 var width: gtk.gint = 360;
 var height: gtk.gint = 180;
 var ok_label: [:0]const u8 = "Yes";
+var switch_ok: bool = false;
 var cancel_label: [:0]const u8 = "No";
+var switch_cancel: bool = false;
 var timeout: ?gtk.guint = null;
 var window_icon: ?[:0]const u8 = null;
 var base_icon: ?[:0]const u8 = null;
@@ -94,6 +96,8 @@ const help_question =
     \\  --question                        Display a question dialog
     \\  --text=TEXT                       Set the dialog text
     \\  --icon=ICONPATH                   Set the icon
+    \\  --switch-ok                       Suppress OK button
+    \\  --switch-cancel                   Suppress Cancel button
 ;
 
 const help_password =
@@ -124,6 +128,28 @@ pub fn ok_callback(_: *gtk.GtkWidget, data: gtk.gpointer) void {
     }
 
     gtk.g_application_quit(@as(*gtk.GApplication, @ptrCast(application)));
+}
+
+const GdkEventKey = extern struct {
+    typ: gtk.GdkEventType,
+    window: *gtk.GdkWindow,
+    send_event: gtk.gint8,
+    time: gtk.guint32,
+    state: gtk.guint,
+    keyval: gtk.guint,
+    length: gtk.gint,
+    string: [*c]gtk.gchar,
+    hardware_keycode: gtk.guint16,
+    group: gtk.guint8,
+    // TODO bit field guint is_modifier : 1;
+};
+
+pub fn on_key_press(w: *gtk.GtkWidget, event: *GdkEventKey, data: gtk.gpointer) gtk.gboolean {
+    if (event.keyval == gtk.GDK_KEY_Return) {
+        ok_callback(w, data);
+    }
+
+    return 0;
 }
 
 pub fn cancel_callback(_: *gtk.GtkWidget, _: gtk.gpointer) void {
@@ -184,6 +210,7 @@ fn activate(app: *gtk.GtkApplication, _: gtk.gpointer) void {
     var window_widget: *gtk.GtkWidget = gtk.gtk_application_window_new(app);
     const window = @as(*gtk.GtkWindow, @ptrCast(window_widget));
     gtk.gtk_window_set_title(window, title);
+    _ = gtk.g_signal_connect_(window, "delete-event", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
     gtk.gtk_window_set_default_size(window, width, height);
     gtk.gtk_container_set_border_width(@as(*gtk.GtkContainer, @ptrCast(window_widget)), 10);
 
@@ -231,13 +258,17 @@ fn questionDialog(window_widget: *gtk.GtkWidget) void {
     const hbox: *gtk.GtkWidget = gtk.gtk_box_new(gtk.GTK_ORIENTATION_HORIZONTAL, 5);
     gtk.gtk_box_pack_end(@as(*gtk.GtkBox, @ptrCast(vbox)), hbox, 0, 0, 0);
 
-    const cancel_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(cancel_label);
-    _ = gtk.g_signal_connect_(cancel_button, "clicked", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
-    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), cancel_button, 1, 1, 0);
+    if (!switch_cancel) {
+        const cancel_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(cancel_label);
+        _ = gtk.g_signal_connect_(cancel_button, "clicked", @as(gtk.GCallback, @ptrCast(&cancel_callback)), null);
+        gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), cancel_button, 1, 1, 0);
+    }
 
-    const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
-    _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), null);
-    gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
+    if (!switch_ok) {
+        const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
+        _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), null);
+        gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
+    }
 }
 
 fn passwordDialog(window_widget: *gtk.GtkWidget) void {
@@ -263,6 +294,8 @@ fn passwordDialog(window_widget: *gtk.GtkWidget) void {
     const ok_button: *gtk.GtkWidget = gtk.gtk_button_new_with_label(ok_label);
     _ = gtk.g_signal_connect_(ok_button, "clicked", @as(gtk.GCallback, @ptrCast(&ok_callback)), entry);
     gtk.gtk_box_pack_start(@as(*gtk.GtkBox, @ptrCast(hbox)), ok_button, 1, 1, 0);
+
+    _ = gtk.g_signal_connect_(window_widget, "key-press-event", @as(gtk.GCallback, @ptrCast(&on_key_press)), entry);
 }
 
 fn fileDialog(window_widget: *gtk.GtkWidget) *gtk.GtkWidget {
@@ -305,18 +338,22 @@ fn parseOptions() void {
         s = arg[0 .. strlen(arg) + 1]; // here we include the 0
         var iter = std.mem.split(u8, s, "=");
         const option_ = iter.next();
-        const argument_ = iter.next();
-        const please_dont = iter.next();
         // Here we make sure the 'argument' is the second half of 'arg' because
         // this implies that it is null-terminated, i.e., we can safely cast
         // argument from a '[]const u8' to a '[:0]const u8'.
         if (option_ == null) continue;
         const option = option_.?;
 
-        if (std.mem.eql(u8, "--directory", option)) {
+        if (std.mem.startsWith(u8, option, "--directory")) {
             directory_only = true;
+        } else if (std.mem.startsWith(u8, option, "--switch-ok")) {
+            switch_ok = true;
+        } else if (std.mem.startsWith(u8, option, "--switch-cancel")) {
+            switch_cancel = true;
         }
 
+        const argument_ = iter.next();
+        const please_dont = iter.next();
         if (argument_ == null or please_dont != null) continue;
         const argument: [:0]const u8 = @ptrCast(argument_.?);
         const argument_no_null = argument[0 .. argument.len - 1];
