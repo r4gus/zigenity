@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.11.0
+          version: 0.12.0
       - run: zig fmt --check src/*.zig
   build:
     runs-on: ubuntu-22.04
@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
       - uses: goto-bus-stop/setup-zig@v2
         with:
-          version: 0.11.0
+          version: 0.12.0
       - run: |
           export VERSION="$(cat build.zig.zon | grep -o -E '\b[0-9]+\.[0-9]+\.[0-9]+\b')"
           sudo apt install libgtk-3-0 libgtk-3-dev
