@@ -12,7 +12,7 @@ Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglan
 | entry | |
 | error | |
 | info | |
-| file-selection | ✅ |
+| file-selection | |
 | list | |
 | notification | |
 | progress | |
@@ -24,20 +24,7 @@ Like [zenity](https://gitlab.gnome.org/GNOME/zenity) but in [Zig](https://ziglan
 | password | ✅ |
 | forms | |
 
-## Dependency
-
-* `gtk+-3.0`
-
 ## Getting started
-
-To build this application you need [Zig 0.11.0](https://ziglang.org/download/).
-After installing Zig run the following commands to build the application:
-
-```
-git clone https://github.com/r4gus/zigenity.git
-cd zigenity
-zig build -Doptimize=ReleaseSmall
-```
 
 Run `zigenity --help` for a list of options.
 
