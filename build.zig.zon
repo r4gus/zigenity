@@ -1,6 +1,14 @@
 .{
-    .name = "zigenity",
-    .version = "0.2.0",
+    .name = .zigenity,
+    .version = "0.4.0",
+    .minimum_zig_version = "0.14.0",
+    .fingerprint = 0xfcca992d7e4330a8,
+    .dependencies = .{
+        .dvui = .{
+            .url = "git+https://github.com/david-vanderson/dvui#a1717e0d0758417cc59de63ab0d65592d08a03ff",
+            .hash = "dvui-0.2.0-AQFJmdyFygC1jjHUPj5ZL1ytb7Usg747fY2vktLsaHce",
+        },
+    },
     .paths = .{
         "src",
         "changelog",

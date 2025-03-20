@@ -4,14 +4,22 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "zigenity",
+    const dvui_dep = b.dependency(
+        "dvui",
+        .{ .target = target, .optimize = optimize, .sdl3 = true },
+    );
+
+    const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    exe.linkLibC();
-    exe.linkSystemLibrary("gtk+-3.0");
+    exe_mod.addImport("dvui", dvui_dep.module("dvui_sdl"));
+
+    const exe = b.addExecutable(.{
+        .name = "zigenity",
+        .root_module = exe_mod,
+    });
 
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
