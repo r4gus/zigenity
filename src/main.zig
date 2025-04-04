@@ -42,6 +42,8 @@ pub fn main() !u8 {
         if (ok_label) |v| gpa.free(v);
         if (cancel_label) |v| gpa.free(v);
         if (text) |v| gpa.free(v);
+        if (base_icon) |v| gpa.free(v);
+        if (window_icon) |v| gpa.free(v);
     }
 
     try parseOptions();
@@ -82,6 +84,7 @@ pub fn main() !u8 {
         .vsync = vsync,
         .title = if (title) |t| t else "zigenity",
         //.icon = window_icon_png, // can also call setIconFromFileContent()
+        .icon = if (window_icon) |icon| icon else null,
     });
     g_backend = backend;
     defer backend.deinit();
@@ -237,7 +240,16 @@ fn parseOptions() !void {
         if (std.mem.eql(u8, "--title", option)) {
             title = try gpa.dupeZ(u8, argument);
         } else if (std.mem.eql(u8, "--window-icon", option)) {
-            window_icon = try gpa.dupe(u8, argument);
+            const f = std.fs.openFileAbsolute(argument, .{}) catch |e| {
+                std.log.err("unable to open icon file '{s}' ({any})", .{ argument, e });
+                continue;
+            };
+            defer f.close();
+
+            window_icon = f.readToEndAlloc(gpa, 50_000_000) catch |e| {
+                std.log.err("unable to read icon file '{s}' ({any})", .{ argument, e });
+                continue;
+            };
         } else if (std.mem.eql(u8, "--width", option)) {
             width = std.fmt.parseFloat(f32, argument) catch {
                 continue;
@@ -262,7 +274,16 @@ fn parseOptions() !void {
                 timeout = timeout_ * 1000; // the timeout is specified in ms
             }
         } else if (std.mem.eql(u8, "--icon", option)) {
-            base_icon = try gpa.dupe(u8, argument);
+            const f = std.fs.openFileAbsolute(argument, .{}) catch |e| {
+                std.log.err("unable to open icon file '{s}' ({any})", .{ argument, e });
+                continue;
+            };
+            defer f.close();
+
+            base_icon = f.readToEndAlloc(gpa, 50_000_000) catch |e| {
+                std.log.err("unable to read icon file '{s}' ({any})", .{ argument, e });
+                continue;
+            };
         }
     }
 }
@@ -311,29 +332,39 @@ fn questionFrame() !void {
     const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer vbox.deinit();
 
-    try dvui.label(
+    var tl = dvui.TextLayoutWidget.init(
         @src(),
-        "{s}",
-        .{if (text) |t| t else "Are you sure you want to proceed?"},
+        .{},
         .{
+            .margin = .all(12.0),
             .gravity_x = 0.5,
             .gravity_y = 0.5,
-            .margin = .all(12.0),
+        },
+    );
+    try tl.install(.{});
+
+    try tl.addText(
+        if (text) |t| t else "Are you sure you want to proceed?",
+        .{
+            .gravity_x = 0.5,
+            .expand = .horizontal,
         },
     );
 
+    tl.deinit();
+
     const hbox = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .gravity_y = 1.0 });
+    {
+        if (try dvui.button(@src(), if (cancel_label) |label| label else "No", .{}, .{ .expand = .horizontal })) {
+            return_code = 1;
+            quit_loop = true;
+        }
 
-    if (try dvui.button(@src(), if (cancel_label) |label| label else "No", .{}, .{ .expand = .horizontal })) {
-        return_code = 1;
-        quit_loop = true;
+        if (try dvui.button(@src(), if (ok_label) |label| label else "Yes", .{}, .{ .expand = .horizontal })) {
+            return_code = 0;
+            quit_loop = true;
+        }
     }
-
-    if (try dvui.button(@src(), if (ok_label) |label| label else "Yes", .{}, .{ .expand = .horizontal })) {
-        return_code = 0;
-        quit_loop = true;
-    }
-
     hbox.deinit();
 }
 
@@ -341,16 +372,26 @@ fn passwordFrame() !void {
     const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer vbox.deinit();
 
-    try dvui.label(
+    var tl = dvui.TextLayoutWidget.init(
         @src(),
-        "{s}",
-        .{if (text) |t| t else "Type your password"},
+        .{},
         .{
+            .margin = .all(12.0),
             .gravity_x = 0.5,
             .gravity_y = 0.5,
-            .margin = .all(12.0),
         },
     );
+    try tl.install(.{});
+
+    try tl.addText(
+        if (text) |t| t else "Type your password",
+        .{
+            .gravity_x = 0.5,
+            .expand = .horizontal,
+        },
+    );
+
+    tl.deinit();
 
     var te = try dvui.textEntry(@src(), .{
         .text = .{ .buffer = &pw_buffer },
