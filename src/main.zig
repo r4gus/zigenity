@@ -412,16 +412,20 @@ fn passwordFrame() !void {
     }
 
     const l = te.len;
+
+    const enter_pressed = te.enter_pressed;
+
     te.deinit();
 
     const hbox = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .gravity_y = 1.0 });
 
     if (try dvui.button(@src(), if (cancel_label) |label| label else "Cancel", .{}, .{ .expand = .horizontal })) {
+        std.crypto.secureZero(u8, pw_buffer[0..]);
         return_code = 1;
         quit_loop = true;
     }
 
-    if (try dvui.button(@src(), if (ok_label) |label| label else "OK", .{}, .{ .expand = .horizontal })) {
+    if (try dvui.button(@src(), if (ok_label) |label| label else "OK", .{}, .{ .expand = .horizontal }) or enter_pressed) {
         try std.io.getStdOut().writer().print("{s}\n", .{pw_buffer[0..l]});
         std.crypto.secureZero(u8, pw_buffer[0..]);
         return_code = 0;
