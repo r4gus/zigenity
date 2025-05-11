@@ -21,7 +21,7 @@ var switch_cancel: bool = false;
 var title: ?[:0]const u8 = null;
 var window_icon: ?[]const u8 = null;
 var width: f32 = 450.0;
-var height: f32 = 160.0;
+var height: f32 = 180.0;
 var ok_label: ?[]const u8 = null;
 var cancel_label: ?[]const u8 = null;
 var text: ?[]const u8 = null;
@@ -83,7 +83,6 @@ pub fn main() !u8 {
         .vsync = vsync,
         .title = if (title) |t| t else "zigenity",
         //.icon = window_icon_png, // can also call setIconFromFileContent()
-        .icon = if (window_icon) |icon| icon else null,
     });
     g_backend = backend;
     defer backend.deinit();
@@ -341,12 +340,22 @@ fn questionFrame() !void {
     const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer vbox.deinit();
 
+    const hbox2 = try dvui.box(@src(), .horizontal, .{
+        .gravity_x = 0.5,
+    });
+
+    if (base_icon) |icon| {
+        try dvui.image(@src(), "test image", icon, .{
+            .max_size_content = .all(96.0),
+            .min_size_content = .all(96.0),
+        });
+    }
+
     var tl = dvui.TextLayoutWidget.init(
         @src(),
         .{},
         .{
             .margin = .all(12.0),
-            .gravity_x = 0.5,
             .gravity_y = 0.5,
         },
     );
@@ -361,6 +370,7 @@ fn questionFrame() !void {
     );
 
     tl.deinit();
+    hbox2.deinit();
 
     const hbox = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .gravity_y = 1.0 });
     {
@@ -381,12 +391,22 @@ fn passwordFrame() !void {
     const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
     defer vbox.deinit();
 
+    const hbox2 = try dvui.box(@src(), .horizontal, .{
+        .gravity_x = 0.5,
+    });
+
+    if (base_icon) |icon| {
+        try dvui.image(@src(), "test image", icon, .{
+            .max_size_content = .all(96.0),
+            .min_size_content = .all(96.0),
+        });
+    }
+
     var tl = dvui.TextLayoutWidget.init(
         @src(),
         .{},
         .{
             .margin = .all(12.0),
-            .gravity_x = 0.5,
             .gravity_y = 0.5,
         },
     );
@@ -401,6 +421,7 @@ fn passwordFrame() !void {
     );
 
     tl.deinit();
+    hbox2.deinit();
 
     var te = try dvui.textEntry(@src(), .{
         .text = .{ .buffer = &pw_buffer },
