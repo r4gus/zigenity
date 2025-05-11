@@ -13,7 +13,6 @@ const vsync = true;
 var scale_val: f32 = 1.0;
 
 var g_backend: ?Backend = null;
-var g_win: ?*dvui.Window = null;
 
 var typ: DialogType = .None;
 var directory_only: bool = false;
@@ -26,7 +25,7 @@ var height: f32 = 160.0;
 var ok_label: ?[]const u8 = null;
 var cancel_label: ?[]const u8 = null;
 var text: ?[]const u8 = null;
-var timeout: ?usize = null;
+var timeout: ?i32 = null;
 var base_icon: ?[]const u8 = null;
 
 var return_code: u8 = 0;
@@ -103,6 +102,16 @@ pub fn main() !u8 {
         // send all SDL events to dvui for processing
         const quit = try backend.addAllEvents(&win);
         if (quit) break :main_loop;
+
+        if (timeout) |tout| {
+            if (dvui.timerDoneOrNone(win.wd.id)) {
+                if (dvui.timerDone(win.wd.id)) {
+                    return_code = 5;
+                    break :main_loop;
+                }
+                try dvui.timer(win.wd.id, tout);
+            }
+        }
 
         // if dvui widgets might not cover the whole window, then need to clear
         // the previous frame's render
@@ -265,13 +274,13 @@ fn parseOptions() !void {
         } else if (std.mem.eql(u8, "--text", option)) {
             text = try gpa.dupe(u8, argument);
         } else if (std.mem.eql(u8, "--timeout", option)) {
-            const timeout_ = std.fmt.parseInt(usize, argument, 0) catch {
+            const timeout_ = std.fmt.parseInt(i32, argument, 0) catch {
                 continue;
             };
 
             // Time must be between 1 second and one hour
             if (timeout_ > 0 and timeout_ < 3600) {
-                timeout = timeout_ * 1000; // the timeout is specified in ms
+                timeout = timeout_ * 1000000; // the timeout is specified in us
             }
         } else if (std.mem.eql(u8, "--icon", option)) {
             const f = std.fs.openFileAbsolute(argument, .{}) catch |e| {
