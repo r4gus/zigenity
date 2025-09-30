@@ -367,12 +367,21 @@ fn questionFrame() !void {
         .gravity_y = 0.5,
     });
 
-    //if (base_icon) |icon| {
-    //    try dvui.image(@src(), "test image", icon, .{
-    //        .max_size_content = .all(96.0),
-    //        .min_size_content = .all(96.0),
-    //    });
-    //}
+    if (base_icon) |icon| {
+        _ = dvui.image(
+            @src(),
+            .{ .source = .{
+                .imageFile = .{
+                    .bytes = icon,
+                    .name = "icon",
+                },
+            } },
+            .{
+                .max_size_content = .all(96.0),
+                .min_size_content = .all(96.0),
+            },
+        );
+    }
 
     var tl = dvui.TextLayoutWidget.init(
         @src(),
@@ -419,12 +428,21 @@ fn passwordFrame() !void {
         .gravity_y = 0.5,
     });
 
-    //if (base_icon) |icon| {
-    //    try dvui.image(@src(), "test image", icon, .{
-    //        .max_size_content = .all(96.0),
-    //        .min_size_content = .all(96.0),
-    //    });
-    //}
+    if (base_icon) |icon| {
+        _ = dvui.image(
+            @src(),
+            .{ .source = .{
+                .imageFile = .{
+                    .bytes = icon,
+                    .name = "icon",
+                },
+            } },
+            .{
+                .max_size_content = .all(96.0),
+                .min_size_content = .all(96.0),
+            },
+        );
+    }
 
     var tl = dvui.TextLayoutWidget.init(
         @src(),
