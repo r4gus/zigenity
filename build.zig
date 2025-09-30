@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     const dvui_dep = b.dependency(
         "dvui",
-        .{ .target = target, .optimize = optimize, .sdl3 = true },
+        .{ .target = target, .optimize = optimize, .backend = .sdl3 },
     );
 
     const exe_mod = b.createModule(.{
@@ -14,7 +14,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe_mod.addImport("dvui", dvui_dep.module("dvui_sdl"));
+    exe_mod.addImport("dvui", dvui_dep.module("dvui_sdl3"));
+    exe_mod.addImport("sdl-backend", dvui_dep.module("sdl3"));
 
     const exe = b.addExecutable(.{
         .name = "zigenity",
@@ -34,9 +35,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = exe_mod,
     });
 
     const run_unit_tests = b.addRunArtifact(unit_tests);

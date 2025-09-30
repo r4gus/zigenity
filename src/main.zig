@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const dvui = @import("dvui");
-const Backend = dvui.backend;
+const Backend = @import("sdl-backend");
 comptime {
     std.debug.assert(@hasDecl(Backend, "SDLBackend"));
 }
@@ -32,8 +32,23 @@ var return_code: u8 = 0;
 var quit_loop: bool = false;
 var pw_buffer: [256]u8 = .{0} ** 256;
 
+var stdout_buffer: [1024]u8 = undefined;
+var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+const stdout = &stdout_writer.interface;
+
+var stderr_buffer: [1024]u8 = undefined;
+var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+const stderr = &stderr_writer.interface;
+
 pub fn main() !u8 {
-    std.log.info("SDL version: {}", .{Backend.getSDLVersion()});
+    if (@import("builtin").os.tag == .windows) { // optional
+        // on windows graphical apps have no console, so output goes to nowhere - attach it manually. related: https://github.com/ziglang/zig/issues/4196
+        dvui.Backend.Common.windowsAttachConsole() catch {};
+    }
+    //std.log.info("SDL version: {any}", .{Backend.getSDLVersion()});
+
+    defer stdout.flush() catch {};
+    defer stderr.flush() catch {};
 
     defer if (gpa_instance.deinit() != .ok) @panic("Memory leak on exit!");
     defer {
@@ -49,27 +64,27 @@ pub fn main() !u8 {
 
     switch (typ) {
         .Help => {
-            try std.io.getStdOut().writeAll(help_text);
+            try stdout.writeAll(help_text);
             return 0;
         },
         .HelpGeneral => {
-            try std.io.getStdOut().writeAll(help_general);
+            try stdout.writeAll(help_general);
             return 0;
         },
         .HelpQuestion => {
-            try std.io.getStdOut().writeAll(help_question);
+            try stdout.writeAll(help_question);
             return 0;
         },
         .HelpPassword => {
-            try std.io.getStdOut().writeAll(help_password);
+            try stdout.writeAll(help_password);
             return 0;
         },
         .HelpFileSelection => {
-            try std.io.getStdOut().writeAll(help_file_selection);
+            try stdout.writeAll(help_file_selection);
             return 0;
         },
         .None => {
-            try std.io.getStdErr().writeAll("You must specify a dialog type. See 'zigenity --help' for details\n");
+            try stderr.writeAll("You must specify a dialog type. See 'zigenity --help' for details\n");
             return 255;
         },
         else => {},
@@ -88,12 +103,19 @@ pub fn main() !u8 {
     defer backend.deinit();
 
     // init dvui Window (maps onto a single OS window)
-    var win = try dvui.Window.init(@src(), gpa, backend.backend(), .{});
+    var win = try dvui.Window.init(
+        @src(),
+        gpa,
+        backend.backend(),
+        .{},
+    );
     defer win.deinit();
+
+    var interrupted = false;
 
     main_loop: while (!quit_loop) {
         // beginWait coordinates with waitTime below to run frames only when needed
-        const nstime = win.beginWait(backend.hasEvent());
+        const nstime = win.beginWait(interrupted);
 
         // marks the beginning of a frame for dvui, can call dvui functions after this
         try win.begin(nstime);
@@ -108,7 +130,7 @@ pub fn main() !u8 {
                     return_code = 5;
                     break :main_loop;
                 }
-                try dvui.timer(win.wd.id, tout);
+                dvui.timer(win.wd.id, tout);
             }
         }
 
@@ -129,15 +151,15 @@ pub fn main() !u8 {
         const end_micros = try win.end(.{});
 
         // cursor management
-        backend.setCursor(win.cursorRequested());
-        backend.textInputRect(win.textInputRequested());
+        try backend.setCursor(win.cursorRequested());
+        try backend.textInputRect(win.textInputRequested());
 
         // render frame to OS
-        backend.renderPresent();
+        try backend.renderPresent();
 
         // waitTime and beginWait combine to achieve variable framerates
-        const wait_event_micros = win.waitTime(end_micros, null);
-        backend.waitEventTimeout(wait_event_micros);
+        const wait_event_micros = win.waitTime(end_micros);
+        interrupted = try backend.waitEventTimeout(wait_event_micros);
     }
 
     return return_code;
@@ -337,19 +359,20 @@ pub fn strlen(s: [*c]const u8) usize {
 }
 
 fn questionFrame() !void {
-    const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
+    const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer vbox.deinit();
 
-    const hbox2 = try dvui.box(@src(), .horizontal, .{
+    const hbox2 = dvui.box(@src(), .{ .dir = .horizontal }, .{
         .gravity_x = 0.5,
+        .gravity_y = 0.5,
     });
 
-    if (base_icon) |icon| {
-        try dvui.image(@src(), "test image", icon, .{
-            .max_size_content = .all(96.0),
-            .min_size_content = .all(96.0),
-        });
-    }
+    //if (base_icon) |icon| {
+    //    try dvui.image(@src(), "test image", icon, .{
+    //        .max_size_content = .all(96.0),
+    //        .min_size_content = .all(96.0),
+    //    });
+    //}
 
     var tl = dvui.TextLayoutWidget.init(
         @src(),
@@ -359,9 +382,9 @@ fn questionFrame() !void {
             .gravity_y = 0.5,
         },
     );
-    try tl.install(.{});
+    tl.install(.{});
 
-    try tl.addText(
+    tl.addText(
         if (text) |t| t else "Are you sure you want to proceed?",
         .{
             .gravity_x = 0.5,
@@ -372,14 +395,14 @@ fn questionFrame() !void {
     tl.deinit();
     hbox2.deinit();
 
-    const hbox = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .gravity_y = 1.0 });
+    const hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .gravity_y = 1.0 });
     {
-        if (try dvui.button(@src(), if (cancel_label) |label| label else "No", .{}, .{ .expand = .horizontal })) {
+        if (dvui.button(@src(), if (cancel_label) |label| label else "No", .{}, .{ .expand = .horizontal })) {
             return_code = 1;
             quit_loop = true;
         }
 
-        if (try dvui.button(@src(), if (ok_label) |label| label else "Yes", .{}, .{ .expand = .horizontal })) {
+        if (dvui.button(@src(), if (ok_label) |label| label else "Yes", .{}, .{ .expand = .horizontal })) {
             return_code = 0;
             quit_loop = true;
         }
@@ -388,19 +411,20 @@ fn questionFrame() !void {
 }
 
 fn passwordFrame() !void {
-    const vbox = try dvui.box(@src(), .vertical, .{ .expand = .both });
+    const vbox = dvui.box(@src(), .{ .dir = .vertical }, .{ .expand = .both });
     defer vbox.deinit();
 
-    const hbox2 = try dvui.box(@src(), .horizontal, .{
+    const hbox2 = dvui.box(@src(), .{ .dir = .horizontal }, .{
         .gravity_x = 0.5,
+        .gravity_y = 0.5,
     });
 
-    if (base_icon) |icon| {
-        try dvui.image(@src(), "test image", icon, .{
-            .max_size_content = .all(96.0),
-            .min_size_content = .all(96.0),
-        });
-    }
+    //if (base_icon) |icon| {
+    //    try dvui.image(@src(), "test image", icon, .{
+    //        .max_size_content = .all(96.0),
+    //        .min_size_content = .all(96.0),
+    //    });
+    //}
 
     var tl = dvui.TextLayoutWidget.init(
         @src(),
@@ -410,9 +434,9 @@ fn passwordFrame() !void {
             .gravity_y = 0.5,
         },
     );
-    try tl.install(.{});
+    tl.install(.{});
 
-    try tl.addText(
+    tl.addText(
         if (text) |t| t else "Type your password",
         .{
             .gravity_x = 0.5,
@@ -423,7 +447,7 @@ fn passwordFrame() !void {
     tl.deinit();
     hbox2.deinit();
 
-    var te = try dvui.textEntry(@src(), .{
+    var te = dvui.textEntry(@src(), .{
         .text = .{ .buffer = &pw_buffer },
         .password_char = "*",
     }, .{ .expand = .horizontal });
@@ -438,16 +462,16 @@ fn passwordFrame() !void {
 
     te.deinit();
 
-    const hbox = try dvui.box(@src(), .horizontal, .{ .expand = .horizontal, .gravity_y = 1.0 });
+    const hbox = dvui.box(@src(), .{ .dir = .horizontal }, .{ .expand = .horizontal, .gravity_y = 1.0 });
 
-    if (try dvui.button(@src(), if (cancel_label) |label| label else "Cancel", .{}, .{ .expand = .horizontal })) {
+    if (dvui.button(@src(), if (cancel_label) |label| label else "Cancel", .{}, .{ .expand = .horizontal })) {
         std.crypto.secureZero(u8, pw_buffer[0..]);
         return_code = 1;
         quit_loop = true;
     }
 
-    if (try dvui.button(@src(), if (ok_label) |label| label else "OK", .{}, .{ .expand = .horizontal }) or enter_pressed) {
-        try std.io.getStdOut().writer().print("{s}\n", .{pw_buffer[0..l]});
+    if (dvui.button(@src(), if (ok_label) |label| label else "OK", .{}, .{ .expand = .horizontal }) or enter_pressed) {
+        try stdout.print("{s}\n", .{pw_buffer[0..l]});
         std.crypto.secureZero(u8, pw_buffer[0..]);
         return_code = 0;
         quit_loop = true;
